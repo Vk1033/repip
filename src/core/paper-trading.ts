@@ -134,20 +134,25 @@ export class PaperTradingEngine {
       }
 
       if (filled) {
-        this.balance -= fillPrice * order.size;
-        const position: Position = {
-          id: 'pos_' + Math.random().toString(36).substring(2, 9),
-          side: order.side,
-          size: order.size,
-          entryPrice: fillPrice,
-          stopLoss: order.stopLoss,
-          takeProfit: order.takeProfit,
-          unrealizedPnL: 0,
-          realizedPnL: 0,
-          openedAt: candle.time,
-        };
-        this.positions.push(position);
-        filledOrders.push(order);
+        const requiredBalance = fillPrice * order.size;
+        if (this.balance >= requiredBalance) {
+          this.balance -= requiredBalance;
+          const position: Position = {
+            id: 'pos_' + Math.random().toString(36).substring(2, 9),
+            side: order.side,
+            size: order.size,
+            entryPrice: fillPrice,
+            stopLoss: order.stopLoss,
+            takeProfit: order.takeProfit,
+            unrealizedPnL: 0,
+            realizedPnL: 0,
+            openedAt: candle.time,
+          };
+          this.positions.push(position);
+          filledOrders.push(order);
+        } else {
+          // Insufficient balance to fund the order - discard/cancel order
+        }
       } else {
         remainingOrders.push(order);
       }
@@ -157,6 +162,15 @@ export class PaperTradingEngine {
     // Check Stop-Loss / Take-Profit triggers on open positions
     for (let i = this.positions.length - 1; i >= 0; i--) {
       const pos = this.positions[i];
+
+      // Positions opened on the current candle should not trigger SL/TP on the same candle
+      // (candle.close is at the end of the candle interval; high/low occurred prior to fill)
+      if (pos.openedAt >= candle.time) {
+        const multiplier = pos.side === 'BUY' ? 1 : -1;
+        pos.unrealizedPnL = (candle.close - pos.entryPrice) * pos.size * multiplier;
+        continue;
+      }
+
       let shouldClose = false;
       let exitPrice = candle.close;
 
@@ -191,7 +205,7 @@ export class PaperTradingEngine {
     return {
       filledOrders,
       closedPositions,
-      positions: this.positions,
+      positions: [...this.positions],
     };
   }
 

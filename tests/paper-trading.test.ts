@@ -288,4 +288,68 @@ describe('PaperTradingEngine', () => {
     expect(resetPortfolio.realizedPnL).toBe(0);
     expect(resetPortfolio.unrealizedPnL).toBe(0);
   });
+
+  it('does not trigger SL/TP on the same candle a position is opened (prevents causality leak)', () => {
+    const engine = new PaperTradingEngine({ initialBalance: 10000 });
+    engine.placeOrder({
+      type: 'MARKET',
+      side: 'BUY',
+      size: 10,
+      stopLoss: 90,
+      takeProfit: 120,
+    });
+
+    // In candle1, intra-candle low is 85 (< SL 90) and high is 125 (> TP 120),
+    // but the market fill happens at close (100). Intra-candle prices occurred prior to fill.
+    const candle1: Candle = { time: 1000, open: 95, high: 125, low: 85, close: 100, volume: 50 };
+    const exec1 = engine.processCandle(candle1);
+
+    expect(exec1.filledOrders).toHaveLength(1);
+    expect(exec1.closedPositions).toHaveLength(0);
+    expect(exec1.positions).toHaveLength(1);
+    expect(exec1.positions[0].entryPrice).toBe(100);
+
+    // On subsequent candle2, low drops to 88 (< SL 90) and SL correctly triggers
+    const candle2: Candle = { time: 1060, open: 100, high: 102, low: 88, close: 95, volume: 50 };
+    const exec2 = engine.processCandle(candle2);
+
+    expect(exec2.closedPositions).toHaveLength(1);
+    expect(exec2.closedPositions[0].exitPrice).toBe(90);
+    expect(exec2.closedPositions[0].pnl).toBe(-100);
+    expect(exec2.positions).toHaveLength(0);
+  });
+
+  it('rejects orders when balance is insufficient to prevent negative balance', () => {
+    const engine = new PaperTradingEngine({ initialBalance: 500 });
+    engine.placeOrder({
+      type: 'MARKET',
+      side: 'BUY',
+      size: 10, // requires 10 * 100 = 1000 > 500
+    });
+
+    const candle: Candle = { time: 1000, open: 100, high: 105, low: 98, close: 100, volume: 50 };
+    const exec = engine.processCandle(candle);
+
+    expect(exec.filledOrders).toHaveLength(0);
+    expect(exec.positions).toHaveLength(0);
+    expect(engine.getPortfolio().balance).toBe(500);
+    expect(engine.getPortfolio().pendingOrders).toHaveLength(0);
+  });
+
+  it('returns cloned positions array from processCandle to prevent state corruption', () => {
+    const engine = new PaperTradingEngine({ initialBalance: 10000 });
+    engine.placeOrder({
+      type: 'MARKET',
+      side: 'BUY',
+      size: 5,
+    });
+
+    const candle: Candle = { time: 1000, open: 100, high: 105, low: 98, close: 100, volume: 50 };
+    const exec = engine.processCandle(candle);
+
+    expect(exec.positions).toHaveLength(1);
+    // Mutating the returned array should not alter internal engine state
+    exec.positions.pop();
+    expect(engine.getPortfolio().positions).toHaveLength(1);
+  });
 });
