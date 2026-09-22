@@ -184,7 +184,7 @@ describe('TopBar Component', () => {
       });
     });
 
-    it('handles Binance fetch error gracefully without crashing', async () => {
+    it('handles Binance fetch error gracefully without updating symbol', async () => {
       const alertMock = vi.fn();
       (globalThis as any).alert = alertMock;
       vi.spyOn(binanceModule, 'fetchBinance1mKlines').mockRejectedValue(new Error('Network error'));
@@ -196,7 +196,7 @@ describe('TopBar Component', () => {
       const ethBtn = findElement(tree, (el) => el.props?.['data-testid'] === 'symbol-btn-ETHUSDT');
       await ethBtn?.props?.onClick?.();
 
-      expect(useStore.getState().symbol).toBe('ETHUSDT');
+      expect(useStore.getState().symbol).toBe('BTCUSDT');
       expect(alertMock).toHaveBeenCalledWith(expect.stringContaining('Network error'));
     });
   });

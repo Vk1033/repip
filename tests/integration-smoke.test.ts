@@ -117,7 +117,7 @@ describe('TradingView Replay Full Workflow Smoke Test', () => {
     expect(closePortfolio.payload.closedTrades.length).toBe(1);
   });
 
-  it('renders App component integrating TopBar, LeftToolbar, ChartContainer, DrawingOverlay, ReplayBar, and TradingPanel', () => {
+  it('renders App component integrating TopBar, LeftToolbar with clear action, ChartContainer, DrawingOverlay, ReplayBar, and TradingPanel', () => {
     const mockWorkerClient = {
       send: vi.fn(),
       onMessage: vi.fn().mockReturnValue(() => {}),
@@ -135,9 +135,40 @@ describe('TradingView Replay Full Workflow Smoke Test', () => {
     expect(html).toContain('data-testid="app-root"');
     expect(html).toContain('data-testid="top-bar"');
     expect(html).toContain('data-testid="left-toolbar"');
+    expect(html).toContain('data-testid="tool-clear"');
     expect(html).toContain('data-testid="chart-container"');
     expect(html).toContain('data-testid="drawing-overlay"');
     expect(html).toContain('data-testid="replay-bar"');
     expect(html).toContain('data-testid="trading-panel"');
+  });
+
+  describe('parseTimestampInput & Jump Usability', () => {
+    it('parses numeric timestamps in seconds correctly', async () => {
+      const { parseTimestampInput } = await import('../src/App');
+      expect(parseTimestampInput('1700000000')).toBe(1700000000);
+      expect(parseTimestampInput('  1700000000  ')).toBe(1700000000);
+    });
+
+    it('converts millisecond timestamps (> 1e11) to seconds', async () => {
+      const { parseTimestampInput } = await import('../src/App');
+      expect(parseTimestampInput('1700000000000')).toBe(1700000000);
+    });
+
+    it('parses human-readable date strings (YYYY-MM-DD and YYYY-MM-DD HH:mm)', async () => {
+      const { parseTimestampInput } = await import('../src/App');
+      const expectedDate = Math.floor(Date.parse('2024-01-01') / 1000);
+      expect(parseTimestampInput('2024-01-01')).toBe(expectedDate);
+
+      const expectedDateTime = Math.floor(Date.parse('2024-01-01 12:30') / 1000);
+      expect(parseTimestampInput('2024-01-01 12:30')).toBe(expectedDateTime);
+    });
+
+    it('returns null for invalid or empty inputs', async () => {
+      const { parseTimestampInput } = await import('../src/App');
+      expect(parseTimestampInput('')).toBeNull();
+      expect(parseTimestampInput('   ')).toBeNull();
+      expect(parseTimestampInput('invalid-date-string-xyz')).toBeNull();
+      expect(parseTimestampInput('-500')).toBeNull();
+    });
   });
 });

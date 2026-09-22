@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { WorkerClient } from './workers/worker-client';
 import { ChartContainer } from './components/ChartContainer';
 import { DrawingOverlay } from './components/DrawingOverlay';
@@ -9,11 +9,36 @@ import { TradingPanel } from './components/TradingPanel';
 import { useStore } from './store/useStore';
 import { fetchBinance1mKlines } from './data/binance';
 import { Candle } from './types/market';
+import { DrawingShape } from './core/drawing-manager';
 import { IChartApi, ISeriesApi } from '@tradingview/lightweight-charts';
 
 export interface AppProps {
   workerClient?: WorkerClient;
   autoLoadData?: boolean;
+}
+
+/**
+ * Parses user input for jumping to a point in time.
+ * Supports numeric Unix timestamps in seconds or ms, as well as human-readable datetime strings.
+ */
+export function parseTimestampInput(rawInput: string): number | null {
+  const input = rawInput.trim();
+  if (!input) return null;
+
+  // Numeric input (Unix timestamp in seconds or milliseconds)
+  if (/^\d+(\.\d+)?$/.test(input)) {
+    const num = parseFloat(input);
+    if (isNaN(num) || num <= 0) return null;
+    return num > 1e11 ? Math.floor(num / 1000) : Math.floor(num);
+  }
+
+  // Datetime string (e.g. YYYY-MM-DD, YYYY-MM-DD HH:mm, ISO 8601)
+  const parsedMs = Date.parse(input);
+  if (!isNaN(parsedMs) && parsedMs > 0) {
+    return Math.floor(parsedMs / 1000);
+  }
+
+  return null;
 }
 
 export function App({ workerClient: initialClient, autoLoadData = true }: AppProps = {}) {
@@ -22,6 +47,7 @@ export function App({ workerClient: initialClient, autoLoadData = true }: AppPro
   const [lastUpdate, setLastUpdate] = useState<{ candle: Candle; isNewBar: boolean } | null>(null);
   const [chartApi, setChartApi] = useState<IChartApi | null>(null);
   const [seriesApi, setSeriesApi] = useState<ISeriesApi<'Candlestick'> | null>(null);
+  const [shapes, setShapes] = useState<DrawingShape[]>([]);
 
   const setReplayState = useStore((s) => s.setReplayState);
   const setPortfolio = useStore((s) => s.setPortfolio);
@@ -94,15 +120,19 @@ export function App({ workerClient: initialClient, autoLoadData = true }: AppPro
     };
   }, [initialClient, autoLoadData, setReplayState, setPortfolio]);
 
+  const handleClearDrawings = useCallback(() => {
+    setShapes([]);
+  }, []);
+
   const handleJumpClick = () => {
     if (!workerClient) return;
     const input =
       typeof window !== 'undefined' && window.prompt
-        ? window.prompt('Enter Unix timestamp (seconds) to jump to:')
+        ? window.prompt('Enter timestamp (Unix seconds) or date (e.g. YYYY-MM-DD or YYYY-MM-DD HH:mm):')
         : null;
     if (input) {
-      const ts = parseInt(input.trim(), 10);
-      if (!isNaN(ts) && ts > 0) {
+      const ts = parseTimestampInput(input);
+      if (ts !== null && ts > 0) {
         workerClient.send({ type: 'JUMP_TO_TIMESTAMP', payload: { timestamp: ts } });
       }
     }
@@ -116,7 +146,7 @@ export function App({ workerClient: initialClient, autoLoadData = true }: AppPro
       <TopBar workerClient={workerClient} />
 
       <div className="flex-1 flex relative overflow-hidden">
-        <LeftToolbar />
+        <LeftToolbar onClearDrawings={handleClearDrawings} />
 
         <div className="flex-1 relative overflow-hidden">
           <ChartContainer
@@ -127,7 +157,13 @@ export function App({ workerClient: initialClient, autoLoadData = true }: AppPro
               setSeriesApi(series);
             }}
           />
-          <DrawingOverlay chart={chartApi} series={seriesApi} />
+          <DrawingOverlay
+            chart={chartApi}
+            series={seriesApi}
+            shapes={shapes}
+            onShapesChange={setShapes}
+            onClearDrawings={handleClearDrawings}
+          />
           <ReplayBar workerClient={workerClient} onJumpClick={handleJumpClick} />
         </div>
 

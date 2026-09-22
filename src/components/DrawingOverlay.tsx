@@ -7,7 +7,9 @@ export interface DrawingOverlayProps {
   chart: IChartApi | null;
   series: ISeriesApi<'Candlestick'> | null;
   initialShapes?: DrawingShape[];
+  shapes?: DrawingShape[];
   onShapesChange?: (shapes: DrawingShape[]) => void;
+  onClearDrawings?: () => void;
 }
 
 export const DEFAULT_TOOL_COLORS: Record<string, string> = {
@@ -22,30 +24,55 @@ export const DrawingOverlay: React.FC<DrawingOverlayProps> = ({
   chart,
   series,
   initialShapes,
+  shapes: controlledShapes,
   onShapesChange,
+  onClearDrawings,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [shapes, setShapes] = useState<DrawingShape[]>(initialShapes ?? []);
+  const [internalShapes, setInternalShapes] = useState<DrawingShape[]>(initialShapes ?? []);
+  const shapes = controlledShapes !== undefined ? controlledShapes : internalShapes;
   const [currentPoints, setCurrentPoints] = useState<DrawingPoint[]>([]);
   const [mousePreview, setMousePreview] = useState<{ x: number; y: number } | null>(null);
 
   const activeTool = useStore((s) => s.activeDrawingTool);
   const setActiveTool = useStore((s) => s.setActiveDrawingTool);
 
-  // Pure updater for shapes state
-  const updateShapes = useCallback(
-    (updater: (prev: DrawingShape[]) => DrawingShape[]) => {
-      setShapes(updater);
-    },
-    []
-  );
-
   // Safely execute external callback when shapes change outside render/updater phase
   const onShapesChangeRef = useRef(onShapesChange);
   onShapesChangeRef.current = onShapesChange;
+
+  const onClearDrawingsRef = useRef(onClearDrawings);
+  onClearDrawingsRef.current = onClearDrawings;
+
+  // Pure updater for shapes state
+  const updateShapes = useCallback(
+    (updater: (prev: DrawingShape[]) => DrawingShape[]) => {
+      if (controlledShapes !== undefined) {
+        const next = updater(controlledShapes);
+        onShapesChangeRef.current?.(next);
+      } else {
+        setInternalShapes((prev) => {
+          const next = updater(prev);
+          onShapesChangeRef.current?.(next);
+          return next;
+        });
+      }
+    },
+    [controlledShapes]
+  );
+
+  // When shapes are cleared, reset any in-progress drawing points
+  useEffect(() => {
+    if (controlledShapes !== undefined && controlledShapes.length === 0) {
+      setCurrentPoints([]);
+      setMousePreview(null);
+    }
+  }, [controlledShapes]);
+
   const isFirstMountRef = useRef(true);
 
   useEffect(() => {
+    if (controlledShapes !== undefined) return;
     if (isFirstMountRef.current) {
       isFirstMountRef.current = false;
       return;
@@ -53,7 +80,7 @@ export const DrawingOverlay: React.FC<DrawingOverlayProps> = ({
     if (onShapesChangeRef.current) {
       onShapesChangeRef.current(shapes);
     }
-  }, [shapes]);
+  }, [shapes, controlledShapes]);
 
   // Redraw all shapes on the canvas
   const redraw = useCallback(() => {

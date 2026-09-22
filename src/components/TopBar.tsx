@@ -69,8 +69,8 @@ export const TopBar: FC<TopBarProps> = ({ workerClient }) => {
     if (!workerClient) return;
     try {
       setLoadingSymbol(sym);
-      setSymbol(sym);
       const candles = await fetchBinance1mKlines(sym, 1000);
+      setSymbol(sym);
       workerClient.send({ type: 'LOAD_DATA', payload: { candles } });
     } catch (err: any) {
       notifyUser('Error fetching symbol: ' + (err?.message || String(err)));
