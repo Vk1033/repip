@@ -10,6 +10,14 @@ export interface DrawingOverlayProps {
   onShapesChange?: (shapes: DrawingShape[]) => void;
 }
 
+export const DEFAULT_TOOL_COLORS: Record<string, string> = {
+  trendline: '#2962ff',       // Classic TradingView blue
+  horizontal_ray: '#f59e0b',  // Amber
+  rectangle: '#8b5cf6',       // Purple (Order Block)
+  position: '#26a69a',        // Bullish teal
+  fibonacci: '#06b6d4',       // Cyan
+};
+
 export const DrawingOverlay: React.FC<DrawingOverlayProps> = ({
   chart,
   series,
@@ -24,19 +32,28 @@ export const DrawingOverlay: React.FC<DrawingOverlayProps> = ({
   const activeTool = useStore((s) => s.activeDrawingTool);
   const setActiveTool = useStore((s) => s.setActiveDrawingTool);
 
-  // Sync shapes state changes to optional parent callback
+  // Pure updater for shapes state
   const updateShapes = useCallback(
     (updater: (prev: DrawingShape[]) => DrawingShape[]) => {
-      setShapes((prev) => {
-        const next = updater(prev);
-        if (onShapesChange) {
-          onShapesChange(next);
-        }
-        return next;
-      });
+      setShapes(updater);
     },
-    [onShapesChange]
+    []
   );
+
+  // Safely execute external callback when shapes change outside render/updater phase
+  const onShapesChangeRef = useRef(onShapesChange);
+  onShapesChangeRef.current = onShapesChange;
+  const isFirstMountRef = useRef(true);
+
+  useEffect(() => {
+    if (isFirstMountRef.current) {
+      isFirstMountRef.current = false;
+      return;
+    }
+    if (onShapesChangeRef.current) {
+      onShapesChangeRef.current(shapes);
+    }
+  }, [shapes]);
 
   // Redraw all shapes on the canvas
   const redraw = useCallback(() => {
@@ -45,7 +62,13 @@ export const DrawingOverlay: React.FC<DrawingOverlayProps> = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // Scale canvas context by devicePixelRatio for crisp rendering on high-DPI displays
+    const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    const cssWidth = canvas.width / dpr;
+    const cssHeight = canvas.height / dpr;
+    ctx.clearRect(0, 0, cssWidth, cssHeight);
 
     const timeScale = chart.timeScale();
 
@@ -59,18 +82,18 @@ export const DrawingOverlay: React.FC<DrawingOverlayProps> = ({
       const y1 = series.priceToCoordinate(p1.price) ?? -100;
 
       if (shape.type === 'horizontal_ray') {
-        ctx.strokeStyle = shape.color || '#f59e0b';
+        ctx.strokeStyle = shape.color || DEFAULT_TOOL_COLORS.horizontal_ray;
         ctx.lineWidth = 1.5;
         ctx.setLineDash([4, 4]);
         ctx.beginPath();
         ctx.moveTo(x1, y1);
-        ctx.lineTo(canvas.width, y1);
+        ctx.lineTo(cssWidth, y1);
         ctx.stroke();
         ctx.setLineDash([]);
       } else if (shape.type === 'trendline' && p2) {
         const x2 = timeScale.timeToCoordinate(p2.time as unknown as Time) ?? -100;
         const y2 = series.priceToCoordinate(p2.price) ?? -100;
-        ctx.strokeStyle = shape.color || '#2962ff';
+        ctx.strokeStyle = shape.color || DEFAULT_TOOL_COLORS.trendline;
         ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.moveTo(x1, y1);
@@ -79,8 +102,8 @@ export const DrawingOverlay: React.FC<DrawingOverlayProps> = ({
       } else if (shape.type === 'rectangle' && p2) {
         const x2 = timeScale.timeToCoordinate(p2.time as unknown as Time) ?? -100;
         const y2 = series.priceToCoordinate(p2.price) ?? -100;
-        ctx.fillStyle = 'rgba(41, 98, 255, 0.15)';
-        ctx.strokeStyle = shape.color || '#2962ff';
+        ctx.fillStyle = 'rgba(139, 92, 246, 0.15)';
+        ctx.strokeStyle = shape.color || DEFAULT_TOOL_COLORS.rectangle;
         ctx.lineWidth = 1.5;
         ctx.fillRect(x1, y1, x2 - x1, y2 - y1);
         ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
@@ -127,7 +150,7 @@ export const DrawingOverlay: React.FC<DrawingOverlayProps> = ({
 
         levels.forEach((lvl) => {
           const y = y1 + dy * lvl;
-          ctx.strokeStyle = shape.color || '#2962ff';
+          ctx.strokeStyle = shape.color || DEFAULT_TOOL_COLORS.fibonacci;
           ctx.lineWidth = 1;
           ctx.beginPath();
           ctx.moveTo(left, y);
@@ -156,7 +179,7 @@ export const DrawingOverlay: React.FC<DrawingOverlayProps> = ({
       if (mousePreview) {
         ctx.save();
         ctx.setLineDash([3, 3]);
-        ctx.strokeStyle = '#2962ff';
+        ctx.strokeStyle = DEFAULT_TOOL_COLORS[activeTool] || '#2962ff';
         ctx.lineWidth = 1.5;
 
         if (activeTool === 'trendline') {
@@ -165,7 +188,7 @@ export const DrawingOverlay: React.FC<DrawingOverlayProps> = ({
           ctx.lineTo(mousePreview.x, mousePreview.y);
           ctx.stroke();
         } else if (activeTool === 'rectangle') {
-          ctx.fillStyle = 'rgba(41, 98, 255, 0.1)';
+          ctx.fillStyle = 'rgba(139, 92, 246, 0.1)';
           ctx.fillRect(x1, y1, mousePreview.x - x1, mousePreview.y - y1);
           ctx.strokeRect(x1, y1, mousePreview.x - x1, mousePreview.y - y1);
         } else if (activeTool === 'position') {
@@ -181,34 +204,53 @@ export const DrawingOverlay: React.FC<DrawingOverlayProps> = ({
     }
   }, [chart, series, shapes, currentPoints, activeTool, mousePreview]);
 
-  // Subscribe to chart zoom, pan, and scroll range events
+  // Stable redraw reference to prevent timescale subscription churn
+  const redrawRef = useRef(redraw);
+  redrawRef.current = redraw;
+
+  // Subscribe to chart zoom, pan, and scroll range events ONCE per chart instance
   useEffect(() => {
     if (!chart) return;
     const timeScale = chart.timeScale();
 
-    timeScale.subscribeVisibleTimeRangeChange(redraw);
-    timeScale.subscribeVisibleLogicalRangeChange(redraw);
-    redraw();
+    const onTimescaleChange = () => {
+      redrawRef.current();
+    };
+
+    timeScale.subscribeVisibleTimeRangeChange(onTimescaleChange);
+    timeScale.subscribeVisibleLogicalRangeChange(onTimescaleChange);
+    onTimescaleChange();
 
     return () => {
-      timeScale.unsubscribeVisibleTimeRangeChange(redraw);
-      timeScale.unsubscribeVisibleLogicalRangeChange(redraw);
+      timeScale.unsubscribeVisibleTimeRangeChange(onTimescaleChange);
+      timeScale.unsubscribeVisibleLogicalRangeChange(onTimescaleChange);
     };
-  }, [chart, redraw]);
+  }, [chart]);
 
-  // Adjust canvas pixel buffer resolution to match container sizing
+  // Trigger redraw whenever shapes, active tool, current points, or mouse preview changes
+  useEffect(() => {
+    redraw();
+  }, [redraw]);
+
+  // Adjust canvas pixel buffer resolution for devicePixelRatio and container dimensions
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
     const updateSize = () => {
       const parent = canvas.parentElement;
-      const w = parent?.clientWidth || (typeof window !== 'undefined' ? window.innerWidth : 800);
-      const h = parent?.clientHeight || (typeof window !== 'undefined' ? window.innerHeight : 600);
-      if (canvas.width !== w || canvas.height !== h) {
-        canvas.width = w;
-        canvas.height = h;
-        redraw();
+      const cssW = parent?.clientWidth || (typeof window !== 'undefined' ? window.innerWidth : 800);
+      const cssH = parent?.clientHeight || (typeof window !== 'undefined' ? window.innerHeight : 600);
+      const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
+      const targetW = Math.round(cssW * dpr);
+      const targetH = Math.round(cssH * dpr);
+
+      if (canvas.width !== targetW || canvas.height !== targetH) {
+        canvas.width = targetW;
+        canvas.height = targetH;
+        canvas.style.width = `${cssW}px`;
+        canvas.style.height = `${cssH}px`;
+        redrawRef.current();
       }
     };
 
@@ -230,7 +272,7 @@ export const DrawingOverlay: React.FC<DrawingOverlayProps> = ({
         window.removeEventListener('resize', updateSize);
       }
     };
-  }, [redraw]);
+  }, []);
 
   // Reset in-progress points when tool is switched to cursor or cancelled
   useEffect(() => {
@@ -289,7 +331,7 @@ export const DrawingOverlay: React.FC<DrawingOverlayProps> = ({
           id: Math.random().toString(),
           type: 'horizontal_ray',
           points: [pt],
-          color: '#f59e0b',
+          color: DEFAULT_TOOL_COLORS.horizontal_ray,
         },
       ]);
       setActiveTool('cursor');
@@ -302,7 +344,7 @@ export const DrawingOverlay: React.FC<DrawingOverlayProps> = ({
       if (currentPoints.length === 0) {
         setCurrentPoints([pt]);
       } else {
-        const color = activeTool === 'rectangle' ? '#2962ff' : '#2962ff';
+        const color = DEFAULT_TOOL_COLORS[activeTool] || '#2962ff';
         updateShapes((prev) => [
           ...prev,
           {
@@ -325,8 +367,8 @@ export const DrawingOverlay: React.FC<DrawingOverlayProps> = ({
     <canvas
       ref={canvasRef}
       data-testid="drawing-overlay"
-      width={typeof window !== 'undefined' ? window.innerWidth : 800}
-      height={typeof window !== 'undefined' ? window.innerHeight : 600}
+      width={typeof window !== 'undefined' ? Math.round(window.innerWidth * (window.devicePixelRatio || 1)) : 800}
+      height={typeof window !== 'undefined' ? Math.round(window.innerHeight * (window.devicePixelRatio || 1)) : 600}
       onClick={handleCanvasClick}
       onMouseMove={handleMouseMove}
       className={`absolute inset-0 z-10 ${
