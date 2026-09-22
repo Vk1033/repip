@@ -205,5 +205,41 @@ describe('ReplayClock', () => {
       expect(state.totalCandles).toBe(20);
       expect(state.currentCandle).toEqual(newCandles[5]);
     });
+
+    it('dispose() stops playback and clears all listeners and active timers', () => {
+      const clock = new ReplayClock(buffer, 0);
+      const ticks: number[] = [];
+      clock.onTick((_, idx) => ticks.push(idx));
+
+      clock.play();
+      expect(clock.getState().isPlaying).toBe(true);
+
+      clock.dispose();
+      expect(clock.getState().isPlaying).toBe(false);
+
+      // Timers should be cleared
+      vi.advanceTimersByTime(2000);
+      expect(clock.getState().currentIndex).toBe(0);
+      expect(ticks).toHaveLength(0);
+
+      // Listeners are cleared
+      clock.step(1);
+      expect(ticks).toHaveLength(0);
+    });
+
+    it('tracks lastTickTime and runs accurately at high playback speeds (10x-60x)', () => {
+      const clock = new ReplayClock(buffer, 0);
+      clock.setSpeed(60); // 60 bars / sec
+      expect(clock.getState().speed).toBe(60);
+
+      clock.play();
+      expect(clock.getLastTickTime()).toBeGreaterThanOrEqual(0);
+
+      // Over 1000ms at 60x, 60 bars should play
+      vi.advanceTimersByTime(1000);
+      expect(clock.getState().currentIndex).toBe(60);
+
+      clock.pause();
+    });
   });
 });

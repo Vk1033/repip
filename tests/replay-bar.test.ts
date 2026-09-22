@@ -202,12 +202,12 @@ describe('ReplayBar Component', () => {
   });
 
   describe('Playback Speed Controls', () => {
-    it('renders all speed option buttons [0.5, 1, 2, 5, 10]', () => {
+    it('renders all speed option buttons [0.5, 1, 2, 5, 10, 30, 60]', () => {
       const { tree } = renderReplayBar({
         workerClient: mockWorkerClient as unknown as WorkerClient,
       });
 
-      expect(SPEED_OPTIONS).toEqual([0.5, 1, 2, 5, 10]);
+      expect(SPEED_OPTIONS).toEqual([0.5, 1, 2, 5, 10, 30, 60]);
 
       for (const speed of SPEED_OPTIONS) {
         const btn = findElement(tree, (el) => el.props?.['data-testid'] === `speed-btn-${speed}`);
@@ -263,6 +263,27 @@ describe('ReplayBar Component', () => {
   });
 
   describe('Candle Progress Bar Counter', () => {
+    it('displays 0 / 0 when totalCandles is 0', () => {
+      useStore.setState({
+        replayState: {
+          currentIndex: 0,
+          isPlaying: false,
+          speed: 1,
+          currentCandle: null,
+          totalCandles: 0,
+        },
+      });
+
+      const { html, tree } = renderReplayBar({
+        workerClient: mockWorkerClient as unknown as WorkerClient,
+      });
+
+      const counter = findElement(tree, (el) => el.props?.['data-testid'] === 'bar-counter');
+      expect(counter).not.toBeNull();
+      expect(html).toContain('0 / 0');
+      expect(html).not.toContain('1 / 0');
+    });
+
     it('displays 1 / 100 when at the first candle (currentIndex = 0)', () => {
       useStore.setState({
         replayState: {

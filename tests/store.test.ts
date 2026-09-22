@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { useStore, initialStoreState, type AppStore } from '../src/store/useStore';
+import { useStore, initialStoreState, createInitialStoreState, type AppStore } from '../src/store/useStore';
 import { ReplayState } from '../src/core/replay-clock';
 import { PortfolioState } from '../src/core/paper-trading';
 import { Candle, Timeframe } from '../src/types/market';
 
 describe('Zustand App Store (useStore)', () => {
   beforeEach(() => {
-    useStore.setState(initialStoreState);
+    useStore.setState(createInitialStoreState());
   });
 
   describe('Initial State', () => {
@@ -52,6 +52,16 @@ describe('Zustand App Store (useStore)', () => {
         ema50: false,
         rsi14: false,
       });
+    });
+
+    it('uses a factory function returning fresh array references to avoid state pollution', () => {
+      const state1 = createInitialStoreState();
+      const state2 = createInitialStoreState();
+      expect(state1.portfolio.positions).not.toBe(state2.portfolio.positions);
+      expect(state1.portfolio.pendingOrders).not.toBe(state2.portfolio.pendingOrders);
+      expect(state1.portfolio.closedTrades).not.toBe(state2.portfolio.closedTrades);
+      expect(initialStoreState.symbol).toBe('BTCUSDT');
+      expect(state1.portfolio.positions).not.toBe(initialStoreState.portfolio.positions);
     });
   });
 

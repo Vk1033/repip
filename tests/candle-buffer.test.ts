@@ -54,4 +54,24 @@ describe('CandleBuffer', () => {
     expect(buffer.sliceCandles(-2, 10)).toEqual(candles);
     expect(buffer.sliceCandles(2, 1)).toEqual([]);
   });
+
+  it('throws an error if input arrays have mismatched lengths', () => {
+    const valid = new Float64Array(3);
+    const short = new Float64Array(2);
+    expect(() => new CandleBuffer(valid, short, valid, valid, valid, valid)).toThrow(
+      /CandleBuffer array length mismatch/
+    );
+    expect(() => new CandleBuffer(valid, valid, short, valid, valid, valid)).toThrow(
+      /CandleBuffer array length mismatch/
+    );
+    expect(() => new CandleBuffer(valid, valid, valid, short, valid, valid)).toThrow(
+      /CandleBuffer array length mismatch/
+    );
+    expect(() => new CandleBuffer(valid, valid, valid, valid, short, valid)).toThrow(
+      /CandleBuffer array length mismatch/
+    );
+    expect(() => new CandleBuffer(valid, valid, valid, valid, valid, short)).toThrow(
+      /CandleBuffer array length mismatch/
+    );
+  });
 });

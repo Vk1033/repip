@@ -2,41 +2,26 @@ import { Candle } from '../types/market';
 
 export async function fetchBinance1mKlines(
   symbol: string = 'BTCUSDT',
-  limitOrStartTime: number = 1000,
-  endTimeOrLimit?: number,
-  startTime?: number
+  limitOrStart: number = 1000,
+  endTimestamp?: number
 ): Promise<Candle[]> {
-  let limit = 1000;
-  let end: number | undefined;
-  let start: number | undefined;
-
-  if (limitOrStartTime > 10000) {
-    // Called as (symbol, startTime, limit)
-    start = limitOrStartTime;
-    if (endTimeOrLimit !== undefined && endTimeOrLimit <= 1000) {
-      limit = endTimeOrLimit;
-    }
-  } else {
-    // Called as (symbol, limit, endTime, startTime)
-    limit = limitOrStartTime;
-    end = endTimeOrLimit;
-    start = startTime;
-  }
-
   const params = new URLSearchParams({
     symbol: symbol.toUpperCase(),
     interval: '1m',
-    limit: limit.toString(),
   });
 
-  if (start !== undefined) {
-    const ms = start > 1e11 ? start : start * 1000;
-    params.append('startTime', ms.toString());
+  if (limitOrStart > 10000) {
+    const startMs = limitOrStart > 1e11 ? limitOrStart : limitOrStart * 1000;
+    params.set('startTime', Math.floor(startMs).toString());
+  } else {
+    params.set('limit', limitOrStart.toString());
   }
-  if (end !== undefined) {
-    const ms = end > 1e11 ? end : end * 1000;
-    params.append('endTime', ms.toString());
+
+  if (endTimestamp !== undefined && endTimestamp > 10000) {
+    const endMs = endTimestamp > 1e11 ? endTimestamp : endTimestamp * 1000;
+    params.set('endTime', Math.floor(endMs).toString());
   }
+
 
   const response = await fetch(`https://api.binance.com/api/v3/klines?${params.toString()}`);
   if (!response.ok) {

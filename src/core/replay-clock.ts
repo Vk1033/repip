@@ -16,8 +16,10 @@ export class ReplayClock {
   private currentIndex: number;
   private isPlaying: boolean = false;
   private speed: number = 1; // 1 bar per second default
-  private timerId: ReturnType<typeof setInterval> | null = null;
+  private timerId: ReturnType<typeof setTimeout> | null = null;
   private onTickListeners: Set<TickCallback> = new Set();
+  private lastTickTime: number = 0;
+  private nextTickTarget: number = 0;
 
   constructor(buffer: CandleBuffer, initialIndex: number = 0) {
     this.buffer = buffer;
@@ -58,27 +60,48 @@ export class ReplayClock {
     };
   }
 
+  getLastTickTime(): number {
+    return this.lastTickTime;
+  }
+
   play(): void {
     if (this.isPlaying || this.buffer.length === 0 || this.currentIndex >= this.buffer.length - 1) {
       return;
     }
     this.isPlaying = true;
-    this.scheduleTimer();
+    const now = performance.now();
+    this.lastTickTime = now;
+    const interval = 1000 / this.speed;
+    this.nextTickTarget = now + interval;
+    this.scheduleTimer(interval);
   }
 
   pause(): void {
     this.isPlaying = false;
     if (this.timerId !== null) {
-      clearInterval(this.timerId);
+      clearTimeout(this.timerId);
       this.timerId = null;
     }
+  }
+
+  dispose(): void {
+    this.pause();
+    this.onTickListeners.clear();
   }
 
   setSpeed(barsPerSecond: number): void {
     const validSpeed = Number.isFinite(barsPerSecond) ? barsPerSecond : 1;
     this.speed = Math.max(0.1, Math.min(60, validSpeed));
     if (this.isPlaying) {
-      this.scheduleTimer();
+      if (this.timerId !== null) {
+        clearTimeout(this.timerId);
+        this.timerId = null;
+      }
+      const now = performance.now();
+      this.lastTickTime = now;
+      const interval = 1000 / this.speed;
+      this.nextTickTarget = now + interval;
+      this.scheduleTimer(interval);
     }
   }
 
@@ -115,19 +138,45 @@ export class ReplayClock {
     return this.jumpToIndex(index);
   }
 
-  private scheduleTimer(): void {
+  private scheduleTimer(delay: number): void {
     if (this.timerId !== null) {
-      clearInterval(this.timerId);
+      clearTimeout(this.timerId);
+      this.timerId = null;
+    }
+    this.timerId = setTimeout(() => {
+      this.tick();
+    }, Math.max(0, Math.round(delay)));
+  }
+
+  private tick(): void {
+    this.timerId = null;
+    if (!this.isPlaying) return;
+
+    const now = performance.now();
+    this.lastTickTime = now;
+
+    if (this.currentIndex >= this.buffer.length - 1) {
+      this.pause();
+      return;
     }
 
-    const intervalMs = Math.max(16, Math.floor(1000 / this.speed));
-    this.timerId = setInterval(() => {
-      if (this.currentIndex >= this.buffer.length - 1) {
-        this.pause();
-        return;
-      }
-      this.currentIndex++;
-      this.notify();
-    }, intervalMs);
+    this.currentIndex++;
+    this.notify();
+
+    if (this.currentIndex >= this.buffer.length - 1) {
+      this.pause();
+      return;
+    }
+
+    const interval = 1000 / this.speed;
+    this.nextTickTarget += interval;
+
+    // Guard against massive background freeze
+    if (this.nextTickTarget < now - interval * 4) {
+      this.nextTickTarget = now + interval;
+    }
+
+    const nextDelay = Math.max(0, this.nextTickTarget - performance.now());
+    this.scheduleTimer(nextDelay);
   }
 }

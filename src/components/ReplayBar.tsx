@@ -8,7 +8,7 @@ export interface ReplayBarProps {
   onJumpClick?: () => void;
 }
 
-export const SPEED_OPTIONS = [0.5, 1, 2, 5, 10] as const;
+export const SPEED_OPTIONS = [0.5, 1, 2, 5, 10, 30, 60] as const;
 
 export const ReplayBar: React.FC<ReplayBarProps> = ({ workerClient, onJumpClick }) => {
   const replayState = useStore((s) => s.replayState);
@@ -110,7 +110,7 @@ export const ReplayBar: React.FC<ReplayBarProps> = ({ workerClient, onJumpClick 
         data-testid="bar-counter"
         className="text-xs text-tv-muted font-mono whitespace-nowrap"
       >
-        {replayState.currentIndex + 1} / {replayState.totalCandles}
+        {replayState.totalCandles === 0 ? '0 / 0' : `${replayState.currentIndex + 1} / ${replayState.totalCandles}`}
       </span>
     </div>
   );

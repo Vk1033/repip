@@ -17,13 +17,25 @@ export class CandleBuffer {
     close: Float64Array,
     volume: Float64Array
   ) {
+    const len = time.length;
+    if (
+      open.length !== len ||
+      high.length !== len ||
+      low.length !== len ||
+      close.length !== len ||
+      volume.length !== len
+    ) {
+      throw new Error(
+        `CandleBuffer array length mismatch: time(${len}), open(${open.length}), high(${high.length}), low(${low.length}), close(${close.length}), volume(${volume.length})`
+      );
+    }
     this.time = time;
     this.open = open;
     this.high = high;
     this.low = low;
     this.close = close;
     this.volume = volume;
-    this.length = time.length;
+    this.length = len;
   }
 
   static fromCandles(candles: Candle[]): CandleBuffer {

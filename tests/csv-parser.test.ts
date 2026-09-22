@@ -84,6 +84,19 @@ describe('CSV Parser', () => {
     expect(result[1].time).toBe(1700000060);
   });
 
+  it('strictly applies Math.floor to ensure timestamps in seconds are integers', () => {
+    const csv = `timestamp,open,high,low,close,volume
+1700000000.789,10,12,9,11,100
+1700000060.123,11,13,10,12,150`;
+
+    const result = parseCandlesCSV(csv);
+    expect(result).toHaveLength(2);
+    expect(result[0].time).toBe(1700000000);
+    expect(Number.isInteger(result[0].time)).toBe(true);
+    expect(result[1].time).toBe(1700000060);
+    expect(Number.isInteger(result[1].time)).toBe(true);
+  });
+
   it('deduplicates candles with identical timestamps, keeping the first occurrence', () => {
     const csv = `timestamp,open,high,low,close,volume
 1700000000,100,105,95,102,100
@@ -209,7 +222,7 @@ describe('Binance Kline Fetcher', () => {
     });
   });
 
-  it('passes custom symbol, limit, endTime, and startTime', async () => {
+  it('handles limitOrStart <= 10000 as limit and endTimestamp as endTime', async () => {
     let capturedUrl = '';
     globalThis.fetch = vi.fn().mockImplementation(async (url: string) => {
       capturedUrl = url;
@@ -219,15 +232,15 @@ describe('Binance Kline Fetcher', () => {
       };
     });
 
-    await fetchBinance1mKlines('ethusdt', 500, 1700001000, 1700000000);
+    await fetchBinance1mKlines('ethusdt', 500, 1700001000);
 
     expect(capturedUrl).toContain('symbol=ETHUSDT');
     expect(capturedUrl).toContain('limit=500');
     expect(capturedUrl).toContain('endTime=1700001000000');
-    expect(capturedUrl).toContain('startTime=1700000000000');
+    expect(capturedUrl).not.toContain('startTime');
   });
 
-  it('supports (symbol, startTime, limit) positional argument style', async () => {
+  it('handles limitOrStart > 10000 as startTime and endTimestamp as endTime', async () => {
     let capturedUrl = '';
     globalThis.fetch = vi.fn().mockImplementation(async (url: string) => {
       capturedUrl = url;
@@ -237,11 +250,12 @@ describe('Binance Kline Fetcher', () => {
       };
     });
 
-    await fetchBinance1mKlines('SOLUSDT', 1700000000, 250);
+    await fetchBinance1mKlines('SOLUSDT', 1700000000, 1700005000);
 
     expect(capturedUrl).toContain('symbol=SOLUSDT');
     expect(capturedUrl).toContain('startTime=1700000000000');
-    expect(capturedUrl).toContain('limit=250');
+    expect(capturedUrl).toContain('endTime=1700005000000');
+    expect(capturedUrl).not.toContain('limit=');
   });
 
   it('throws descriptive error when response is not ok', async () => {

@@ -56,15 +56,13 @@ export function parseCandlesCSV(csvText: string): Candle[] {
     const num = Number(timeRaw);
 
     if (!isNaN(num) && timeRaw.trim() !== '') {
-      timeSec = num;
-      if (timeSec > 1e11) {
-        timeSec = Math.floor(timeSec / 1000); // ms to sec
-      }
+      timeSec = num > 1e11 ? Math.floor(num / 1000) : Math.floor(num);
     } else {
       timeSec = Math.floor(new Date(timeRaw).getTime() / 1000);
     }
 
     if (isNaN(timeSec)) continue;
+    timeSec = Math.floor(timeSec);
 
     const open = parseNum(cols[openIdx]);
     const high = parseNum(cols[highIdx]);

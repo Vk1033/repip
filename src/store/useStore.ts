@@ -22,35 +22,39 @@ export interface AppStore {
   toggleIndicator: (indicator: keyof AppStore['indicators']) => void;
 }
 
-export const initialStoreState = {
-  symbol: 'BTCUSDT',
-  timeframe: '1m' as Timeframe,
-  replayState: {
-    currentIndex: 0,
-    isPlaying: false,
-    speed: 1,
-    currentCandle: null,
-    totalCandles: 0,
-  },
-  portfolio: {
-    balance: 10000,
-    equity: 10000,
-    realizedPnL: 0,
-    unrealizedPnL: 0,
-    positions: [],
-    pendingOrders: [],
-    closedTrades: [],
-  },
-  activeDrawingTool: 'cursor' as const,
-  indicators: {
-    sma20: false,
-    ema50: false,
-    rsi14: false,
-  },
-};
+export function createInitialStoreState() {
+  return {
+    symbol: 'BTCUSDT',
+    timeframe: '1m' as Timeframe,
+    replayState: {
+      currentIndex: 0,
+      isPlaying: false,
+      speed: 1,
+      currentCandle: null,
+      totalCandles: 0,
+    },
+    portfolio: {
+      balance: 10000,
+      equity: 10000,
+      realizedPnL: 0,
+      unrealizedPnL: 0,
+      positions: [] as PortfolioState['positions'],
+      pendingOrders: [] as PortfolioState['pendingOrders'],
+      closedTrades: [] as PortfolioState['closedTrades'],
+    },
+    activeDrawingTool: 'cursor' as const,
+    indicators: {
+      sma20: false,
+      ema50: false,
+      rsi14: false,
+    },
+  };
+}
+
+export const initialStoreState = createInitialStoreState();
 
 export const useStore = create<AppStore>((set) => ({
-  ...initialStoreState,
+  ...createInitialStoreState(),
   setSymbol: (symbol) => set({ symbol }),
   setTimeframe: (timeframe) => set({ timeframe }),
   setReplayState: (replayState) => set({ replayState }),
