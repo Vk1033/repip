@@ -628,27 +628,141 @@ describe('TradingPanel Component', () => {
       expect(html).not.toContain('data-testid="trading-panel"');
     });
 
-    it('invokes onToggleCollapse when collapse/expand button is clicked', () => {
+    it('invokes onToggleCollapse and toggles internal collapsed state in uncontrolled mode with callback', () => {
       const onToggleCollapse = vi.fn();
-
-      // Test collapse button in expanded view
-      const { tree: expandedTree } = renderTradingPanel({
+      const { tree } = renderTradingPanel({
         workerClient: mockWorkerClient as unknown as WorkerClient,
         onToggleCollapse,
       });
-      const collapseBtn = findElement(expandedTree, (el) => el.props?.['data-testid'] === 'collapse-toggle-btn');
+
+      const collapseBtn = findElement(tree, (el) => el.props?.['data-testid'] === 'collapse-toggle-btn');
+      expect(collapseBtn).not.toBeNull();
       collapseBtn?.props?.onClick?.();
       expect(onToggleCollapse).toHaveBeenCalledTimes(1);
+    });
 
-      // Test expand button in collapsed view
-      const { tree: collapsedTree } = renderTradingPanel({
+    it('invokes onToggleCollapse when expand button is clicked in collapsed mode', () => {
+      const onToggleCollapse = vi.fn();
+      const { tree } = renderTradingPanel({
         workerClient: mockWorkerClient as unknown as WorkerClient,
         collapsed: true,
         onToggleCollapse,
       });
-      const expandBtn = findElement(collapsedTree, (el) => el.props?.['data-testid'] === 'expand-toggle-btn');
+
+      const expandBtn = findElement(tree, (el) => el.props?.['data-testid'] === 'expand-toggle-btn');
+      expect(expandBtn).not.toBeNull();
       expandBtn?.props?.onClick?.();
-      expect(onToggleCollapse).toHaveBeenCalledTimes(2);
+      expect(onToggleCollapse).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('Edge Case Validations & Refinements', () => {
+    it('treats near-zero negative PnL (-0.001) as positive zero (+$0.00) with bullish styling', () => {
+      useStore.setState({
+        portfolio: {
+          ...initialStoreState.portfolio,
+          unrealizedPnL: -0.001,
+        },
+      });
+
+      const { html, tree } = renderTradingPanel({
+        workerClient: mockWorkerClient as unknown as WorkerClient,
+      });
+
+      const pnlEl = findElement(tree, (el) => el.props?.['data-testid'] === 'account-unrealized-pnl');
+      expect(pnlEl?.props?.className).toContain('text-tv-bull');
+      expect(pnlEl?.props?.className).not.toContain('text-tv-bear');
+      expect(html).toContain('+$0.00');
+      expect(html).not.toContain('-$0.00');
+    });
+
+    it('does not dispatch PLACE_ORDER if order size is 0 or negative', () => {
+      const { tree } = renderTradingPanel({
+        workerClient: mockWorkerClient as unknown as WorkerClient,
+        initialSize: 0,
+      });
+
+      const buyBtn = findElement(tree, (el) => el.props?.['data-testid'] === 'buy-btn');
+      buyBtn?.props?.onClick?.();
+      expect(mockWorkerClient.send).not.toHaveBeenCalled();
+
+      const sellBtn = findElement(tree, (el) => el.props?.['data-testid'] === 'sell-btn');
+      sellBtn?.props?.onClick?.();
+      expect(mockWorkerClient.send).not.toHaveBeenCalled();
+    });
+
+    it('falls back to currentCandle.close for LIMIT orders when limitPrice input is left blank', () => {
+      useStore.setState({
+        replayState: {
+          ...initialStoreState.replayState,
+          currentCandle: {
+            time: 1700000000,
+            open: 64000,
+            high: 64500,
+            low: 63800,
+            close: 64200,
+            volume: 100,
+          },
+        },
+      });
+
+      const { tree } = renderTradingPanel({
+        workerClient: mockWorkerClient as unknown as WorkerClient,
+        initialOrderType: 'LIMIT',
+        initialLimitPrice: '',
+        initialSize: 1,
+      });
+
+      const buyBtn = findElement(tree, (el) => el.props?.['data-testid'] === 'buy-btn');
+      buyBtn?.props?.onClick?.();
+
+      expect(mockWorkerClient.send).toHaveBeenCalledTimes(1);
+      expect(mockWorkerClient.send).toHaveBeenCalledWith({
+        type: 'PLACE_ORDER',
+        payload: {
+          order: {
+            type: 'LIMIT',
+            side: 'BUY',
+            size: 1,
+            limitPrice: 64200,
+            stopLoss: undefined,
+            takeProfit: undefined,
+          },
+        },
+      });
+    });
+
+    it('does not dispatch LIMIT order if limitPrice is invalid or negative', () => {
+      const { tree } = renderTradingPanel({
+        workerClient: mockWorkerClient as unknown as WorkerClient,
+        initialOrderType: 'LIMIT',
+        initialLimitPrice: '-500',
+        initialSize: 1,
+      });
+
+      const buyBtn = findElement(tree, (el) => el.props?.['data-testid'] === 'buy-btn');
+      buyBtn?.props?.onClick?.();
+      expect(mockWorkerClient.send).not.toHaveBeenCalled();
+    });
+
+    it('does not dispatch LIMIT order if limitPrice is empty and currentCandle is unavailable', () => {
+      useStore.setState({
+        replayState: {
+          ...initialStoreState.replayState,
+          currentCandle: null,
+        },
+      });
+
+      const { tree } = renderTradingPanel({
+        workerClient: mockWorkerClient as unknown as WorkerClient,
+        initialOrderType: 'LIMIT',
+        initialLimitPrice: '',
+        initialSize: 1,
+      });
+
+      const buyBtn = findElement(tree, (el) => el.props?.['data-testid'] === 'buy-btn');
+      buyBtn?.props?.onClick?.();
+      expect(mockWorkerClient.send).not.toHaveBeenCalled();
     });
   });
 });

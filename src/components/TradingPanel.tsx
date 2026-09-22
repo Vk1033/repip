@@ -80,45 +80,77 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({
   const replayState = useStore((s) => s.replayState);
 
   const handleToggleCollapse = () => {
-    if (onToggleCollapse) {
-      onToggleCollapse();
-    } else {
+    if (controlledCollapsed === undefined) {
       setInternalCollapsed((prev) => !prev);
     }
+    onToggleCollapse?.();
   };
 
   const handleSetOrderType = (type: OrderType) => {
-    setInternalOrderType(type);
+    if (controlledOrderType === undefined) {
+      setInternalOrderType(type);
+    }
     onOrderTypeChange?.(type);
   };
 
   const handleSetSize = (val: number) => {
-    setInternalSize(val);
+    if (controlledSize === undefined) {
+      setInternalSize(val);
+    }
     onSizeChange?.(val);
   };
 
   const handleSetLimitPrice = (val: string) => {
-    setInternalLimitPrice(val);
+    if (controlledLimitPrice === undefined) {
+      setInternalLimitPrice(val);
+    }
     onLimitPriceChange?.(val);
   };
 
   const handleSetStopLoss = (val: string) => {
-    setInternalStopLoss(val);
+    if (controlledStopLoss === undefined) {
+      setInternalStopLoss(val);
+    }
     onStopLossChange?.(val);
   };
 
   const handleSetTakeProfit = (val: string) => {
-    setInternalTakeProfit(val);
+    if (controlledTakeProfit === undefined) {
+      setInternalTakeProfit(val);
+    }
     onTakeProfitChange?.(val);
   };
 
   const handleSetActiveTab = (tab: 'positions' | 'orders') => {
-    setInternalActiveTab(tab);
+    if (controlledActiveTab === undefined) {
+      setInternalActiveTab(tab);
+    }
     onTabChange?.(tab);
   };
 
   const handleOrder = (side: OrderSide) => {
     if (!workerClient) return;
+    if (size <= 0) return;
+
+    let finalLimitPrice: number | undefined = undefined;
+    if (orderType === 'LIMIT') {
+      if (limitPrice) {
+        const parsed = parseFloat(limitPrice);
+        if (isNaN(parsed) || parsed <= 0) return;
+        finalLimitPrice = parsed;
+      } else if (replayState.currentCandle && replayState.currentCandle.close > 0) {
+        finalLimitPrice = replayState.currentCandle.close;
+      } else {
+        return;
+      }
+    }
+
+    const parsedSL = stopLoss ? parseFloat(stopLoss) : undefined;
+    const finalSL = parsedSL !== undefined && !isNaN(parsedSL) && parsedSL > 0 ? parsedSL : undefined;
+
+    const parsedTP = takeProfit ? parseFloat(takeProfit) : undefined;
+    const finalTP = parsedTP !== undefined && !isNaN(parsedTP) && parsedTP > 0 ? parsedTP : undefined;
+
     workerClient.send({
       type: 'PLACE_ORDER',
       payload: {
@@ -126,9 +158,9 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({
           type: orderType,
           side,
           size,
-          limitPrice: limitPrice ? parseFloat(limitPrice) : undefined,
-          stopLoss: stopLoss ? parseFloat(stopLoss) : undefined,
-          takeProfit: takeProfit ? parseFloat(takeProfit) : undefined,
+          limitPrice: finalLimitPrice,
+          stopLoss: finalSL,
+          takeProfit: finalTP,
         },
       },
     });
@@ -169,6 +201,9 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({
   }
 
   const formatPnL = (pnl: number) => {
+    if (Math.abs(pnl) < 0.005) {
+      return '+$0.00';
+    }
     const isPositive = pnl >= 0;
     return `${isPositive ? '+' : '-'}$${Math.abs(pnl).toFixed(2)}`;
   };
@@ -210,7 +245,7 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({
           <span className="text-tv-muted">Unrealized PnL:</span>
           <span
             data-testid="account-unrealized-pnl"
-            className={portfolio.unrealizedPnL >= 0 ? 'text-tv-bull' : 'text-tv-bear'}
+            className={portfolio.unrealizedPnL >= -0.005 ? 'text-tv-bull' : 'text-tv-bear'}
           >
             {formatPnL(portfolio.unrealizedPnL)}
           </span>
@@ -363,7 +398,7 @@ export const TradingPanel: React.FC<TradingPanelProps> = ({
                     <div className="text-right">
                       <div
                         data-testid={`position-pnl-${p.id}`}
-                        className={p.unrealizedPnL >= 0 ? 'text-tv-bull font-bold' : 'text-tv-bear font-bold'}
+                        className={p.unrealizedPnL >= -0.005 ? 'text-tv-bull font-bold' : 'text-tv-bear font-bold'}
                       >
                         {formatPnL(p.unrealizedPnL)}
                       </div>
