@@ -14,7 +14,7 @@ export class AppDB extends Dexie {
   datasets!: Table<StoredDataset, number>;
 
   constructor() {
-    super('TradingViewCloneDB');
+    super('repip');
     this.version(1).stores({
       datasets: '++id, symbol, startTime, endTime',
     });

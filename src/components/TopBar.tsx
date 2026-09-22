@@ -87,7 +87,7 @@ export const TopBar: FC<TopBarProps> = ({ workerClient }) => {
       <div className="flex items-center gap-2">
         <div className="flex items-center gap-1.5 font-bold text-sm text-tv-text mr-2">
           <Activity className="w-5 h-5 text-tv-primary" />
-          <span>TradingView Replay</span>
+          <span>repip</span>
         </div>
 
         {/* Symbol Selector */}

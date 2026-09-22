@@ -285,12 +285,12 @@ describe('Binance Kline Fetcher', () => {
 describe('Dexie AppDB', () => {
   it('instantiates AppDB with datasets table schema', () => {
     const instance = new AppDB();
-    expect(instance.name).toBe('TradingViewCloneDB');
+    expect(instance.name).toBe('repip');
     expect(instance.tables.map(t => t.name)).toContain('datasets');
   });
 
   it('exports singleton db instance', () => {
     expect(db).toBeInstanceOf(AppDB);
-    expect(db.name).toBe('TradingViewCloneDB');
+    expect(db.name).toBe('repip');
   });
 });

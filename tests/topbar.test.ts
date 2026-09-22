@@ -71,7 +71,7 @@ describe('TopBar Component', () => {
 
       expect(tree).not.toBeNull();
       expect(html).toContain('data-testid="top-bar"');
-      expect(html).toContain('TradingView Replay');
+      expect(html).toContain('repip');
       expect(html).toContain('data-testid="symbol-selector"');
       expect(html).toContain('data-testid="timeframe-selector"');
       expect(html).toContain('data-testid="import-csv-btn"');

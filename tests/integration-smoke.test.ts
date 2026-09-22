@@ -17,7 +17,7 @@ vi.spyOn(React, 'useSyncExternalStore').mockImplementation((_subscribe, getSnaps
   return getSnapshot();
 });
 
-describe('TradingView Replay Full Workflow Smoke Test', () => {
+describe('repip Full Workflow Smoke Test', () => {
   beforeEach(() => {
     useStore.setState(initialStoreState);
   });
