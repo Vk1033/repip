@@ -30,17 +30,17 @@
 - Produces: `theme: 'light' | 'dark'`, `setTheme: (theme: 'light' | 'dark') => void` in `useStore`.
 - Produces: `getChartThemeColors(theme: 'light' | 'dark')` in `ChartContainer.tsx`.
 
-- [ ] **Step 1: Write failing test for theme state and chart colors**
+- [x] **Step 1: Write failing test for theme state and chart colors**
 Create `tests/theme-engine.test.ts` testing `useStore` theme default `'light'`, toggle to `'dark'`, and color token mapping.
-- [ ] **Step 2: Run test to confirm failure**
+- [x] **Step 2: Run test to confirm failure**
 Run `npx vitest run tests/theme-engine.test.ts`.
-- [ ] **Step 3: Implement theme state and chart color mapping**
+- [x] **Step 3: Implement theme state and chart color mapping**
 Update `src/store/useStore.ts` with `theme` state and `setTheme`.
 Update `tailwind.config.js` with FX Replay colors (`fx-canvas`, `fx-surface`, `fx-bull`, `fx-bear`, `fx-border`).
 Update `src/components/ChartContainer.tsx` to apply the palette to Lightweight Charts.
-- [ ] **Step 4: Run test to confirm passing**
+- [x] **Step 4: Run test to confirm passing**
 Run `npx vitest run tests/theme-engine.test.ts`.
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 `git commit -am "feat: implement FX Replay theme engine and chart styling"`
 
 ---
@@ -56,15 +56,15 @@ Run `npx vitest run tests/theme-engine.test.ts`.
 - Consumes: `activeTool: DrawingTool`, `onSelectTool: (tool: DrawingTool) => void`, `onClearDrawings: () => void`.
 - Produces: `<FloatingToolbar activeTool={tool} onSelectTool={setTool} onClearDrawings={clear} />`.
 
-- [ ] **Step 1: Write failing test for FloatingToolbar component**
+- [x] **Step 1: Write failing test for FloatingToolbar component**
 Create `tests/floating-toolbar.test.tsx` testing render of favorite tools, active selection highlighting, clear callback, and drag handle presence.
-- [ ] **Step 2: Run test to confirm failure**
+- [x] **Step 2: Run test to confirm failure**
 Run `npx vitest run tests/floating-toolbar.test.tsx`.
-- [ ] **Step 3: Implement FloatingToolbar**
+- [x] **Step 3: Implement FloatingToolbar**
 Create `src/components/FloatingToolbar.tsx` with draggable pill layout, icons (Crosshair, Trendline, Ray, Rectangle, Text, Fib, Ruler, Brush, Trash), and active tool highlighting.
-- [ ] **Step 4: Run test to confirm passing**
+- [x] **Step 4: Run test to confirm passing**
 Run `npx vitest run tests/floating-toolbar.test.tsx`.
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 `git commit -am "feat: implement draggable FloatingToolbar for favorite drawing tools"`
 
 ---
@@ -79,7 +79,7 @@ Run `npx vitest run tests/floating-toolbar.test.tsx`.
 - Consumes: `workerClient: WorkerClient | null`, `onJumpClick?: () => void`, `lastPrice?: number`.
 - Produces: `<FXBottomBar workerClient={client} onJumpClick={jump} lastPrice={price} />`.
 
-- [ ] **Step 1: Write failing test for FXBottomBar**
+- [x] **Step 1: Write failing test for FXBottomBar**
 Create `tests/fx-bottom-bar.test.tsx` verifying:
 - 1-click Buy dispatches `PLACE_ORDER` with `side: 'BUY'`.
 - 1-click Sell dispatches `PLACE_ORDER` with `side: 'SELL'`.
@@ -87,13 +87,13 @@ Create `tests/fx-bottom-bar.test.tsx` verifying:
 - Replay controls (Play, Pause, Step forward/back, Speed change) dispatch appropriate worker messages.
 - Account equity formatted display (`$101,265.00`).
 - Timezone and scale toggle buttons render.
-- [ ] **Step 2: Run test to confirm failure**
+- [x] **Step 2: Run test to confirm failure**
 Run `npx vitest run tests/fx-bottom-bar.test.tsx`.
-- [ ] **Step 3: Implement FXBottomBar**
+- [x] **Step 3: Implement FXBottomBar**
 Build `src/components/FXBottomBar.tsx` matching the FX Replay screenshot layout.
-- [ ] **Step 4: Run test to confirm passing**
+- [x] **Step 4: Run test to confirm passing**
 Run `npx vitest run tests/fx-bottom-bar.test.tsx`.
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 `git commit -am "feat: implement FXBottomBar execution and replay dock"`
 
 ---
@@ -108,15 +108,15 @@ Run `npx vitest run tests/fx-bottom-bar.test.tsx`.
 - Consumes: `workerClient: WorkerClient | null`, `shapes: DrawingShape[]`, `onShapesChange: (shapes: DrawingShape[]) => void`.
 - Produces: `<RightDock workerClient={client} shapes={shapes} onShapesChange={setShapes} />`.
 
-- [ ] **Step 1: Write failing test for RightDock**
+- [x] **Step 1: Write failing test for RightDock**
 Create `tests/right-dock.test.tsx` testing tab selection (+ Order, Object tree, Watchlist, Journal, News), slide-out drawer rendering, Object Tree shape deletion/locking, and Watchlist symbol selection.
-- [ ] **Step 2: Run test to confirm failure**
+- [x] **Step 2: Run test to confirm failure**
 Run `npx vitest run tests/right-dock.test.tsx`.
-- [ ] **Step 3: Implement RightDock and panels**
+- [x] **Step 3: Implement RightDock and panels**
 Create `src/components/RightDock.tsx` with vertical tabs and slide-out panels for Order Ticket, Object Tree, Watchlist, Journal, and News.
-- [ ] **Step 4: Run test to confirm passing**
+- [x] **Step 4: Run test to confirm passing**
 Run `npx vitest run tests/right-dock.test.tsx`.
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 `git commit -am "feat: implement RightDock with Order, Object Tree, Watchlist, Journal, and News drawers"`
 
 ---
@@ -131,15 +131,15 @@ Run `npx vitest run tests/right-dock.test.tsx`.
 - Consumes: `currentTimestamp: number`.
 - Produces: `<TimelineNewsMarkers currentTimestamp={ts} />`.
 
-- [ ] **Step 1: Write failing test for TimelineNewsMarkers**
+- [x] **Step 1: Write failing test for TimelineNewsMarkers**
 Create `tests/timeline-news-markers.test.tsx` verifying news badge rendering along the time axis, event count badges, and popup release details card on hover/click.
-- [ ] **Step 2: Run test to confirm failure**
+- [x] **Step 2: Run test to confirm failure**
 Run `npx vitest run tests/timeline-news-markers.test.tsx`.
-- [ ] **Step 3: Implement TimelineNewsMarkers**
+- [x] **Step 3: Implement TimelineNewsMarkers**
 Create `src/components/TimelineNewsMarkers.tsx` with flag badges and interactive popover cards (CPI, FOMC, NFP, PMI).
-- [ ] **Step 4: Run test to confirm passing**
+- [x] **Step 4: Run test to confirm passing**
 Run `npx vitest run tests/timeline-news-markers.test.tsx`.
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 `git commit -am "feat: implement TimelineNewsMarkers with release details card"`
 
 ---
@@ -154,15 +154,15 @@ Run `npx vitest run tests/timeline-news-markers.test.tsx`.
 **Interfaces:**
 - Assembles `FXTopBar`, `LeftToolbar`, `ChartContainer`, `FloatingToolbar`, `TimelineNewsMarkers`, `FXBottomBar`, and `RightDock`.
 
-- [ ] **Step 1: Write failing test for FXTopBar and App assembly**
+- [x] **Step 1: Write failing test for FXTopBar and App assembly**
 Create `tests/fx-assembly.test.tsx` testing the integrated page rendering, topbar symbol ribbon, and component presence.
-- [ ] **Step 2: Run test to confirm failure**
+- [x] **Step 2: Run test to confirm failure**
 Run `npx vitest run tests/fx-assembly.test.tsx`.
-- [ ] **Step 3: Implement FXTopBar and update App.tsx**
+- [x] **Step 3: Implement FXTopBar and update App.tsx**
 Create `FXTopBar.tsx` with complete timeframe ribbon (`30s`, `1m`, `3m`, `5m`, `15m`, `30m`, `1h`, `2h`, `4h`, `1D`, `1W`, `1M`), indicators trigger, order flow badge, theme toggle, and session code. Wire all components together in `App.tsx`.
-- [ ] **Step 4: Run test to confirm passing**
+- [x] **Step 4: Run test to confirm passing**
 Run `npx vitest run tests/fx-assembly.test.tsx`.
-- [ ] **Step 5: Run full test suite & build check**
+- [x] **Step 5: Run full test suite & build check**
 Run `npm test` and `npm run build`.
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 `git commit -am "feat: assemble complete FX Replay platform with top ribbon and integrated subsystems"`
