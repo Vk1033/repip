@@ -12,6 +12,44 @@ import {
 } from '@tradingview/lightweight-charts';
 import { Candle } from '../types/market';
 
+import { useStore } from '../store/useStore';
+
+export interface ChartThemeColors {
+  background: string;
+  textColor: string;
+  gridColor: string;
+  borderColor: string;
+  upColor: string;
+  downColor: string;
+  wickUpColor: string;
+  wickDownColor: string;
+}
+
+export function getChartThemeColors(theme: 'light' | 'dark'): ChartThemeColors {
+  if (theme === 'light') {
+    return {
+      background: '#e5e8ec',
+      textColor: '#334155',
+      gridColor: '#d5dbe2',
+      borderColor: '#cbd5e1',
+      upColor: '#8ea4c8',
+      downColor: '#334155',
+      wickUpColor: '#64748b',
+      wickDownColor: '#1e293b',
+    };
+  }
+  return {
+    background: '#131722',
+    textColor: '#d1d4dc',
+    gridColor: '#1e222d',
+    borderColor: '#2a2e39',
+    upColor: '#26a69a',
+    downColor: '#ef5350',
+    wickUpColor: '#26a69a',
+    wickDownColor: '#ef5350',
+  };
+}
+
 export interface ChartContainerProps {
   candles: Candle[];
   lastUpdate: { candle: Candle; isNewBar: boolean } | null;
@@ -23,6 +61,7 @@ export const ChartContainer: React.FC<ChartContainerProps> = ({
   lastUpdate,
   onChartReady,
 }) => {
+  const theme = useStore((s) => s.theme);
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candleSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
@@ -34,34 +73,37 @@ export const ChartContainer: React.FC<ChartContainerProps> = ({
   useEffect(() => {
     if (!containerRef.current) return;
 
+    const colors = getChartThemeColors(theme);
+
     const chart = createChart(containerRef.current, {
       layout: {
-        background: { type: ColorType.Solid, color: '#131722' },
-        textColor: '#d1d4dc',
+        background: { type: ColorType.Solid, color: colors.background },
+        textColor: colors.textColor,
       },
       grid: {
-        vertLines: { color: '#1e222d' },
-        horzLines: { color: '#1e222d' },
+        vertLines: { color: colors.gridColor },
+        horzLines: { color: colors.gridColor },
       },
       crosshair: {
         mode: 1, // Magnet
       },
       timeScale: {
-        borderColor: '#2a2e39',
+        borderColor: colors.borderColor,
         timeVisible: true,
         secondsVisible: false,
       },
       rightPriceScale: {
-        borderColor: '#2a2e39',
+        borderColor: colors.borderColor,
       },
     });
 
     const candleSeries = chart.addSeries(CandlestickSeries, {
-      upColor: '#26a69a',
-      downColor: '#ef5350',
-      borderVisible: false,
-      wickUpColor: '#26a69a',
-      wickDownColor: '#ef5350',
+      upColor: colors.upColor,
+      downColor: colors.downColor,
+      borderVisible: true,
+      borderColor: colors.downColor,
+      wickUpColor: colors.wickUpColor,
+      wickDownColor: colors.wickDownColor,
     });
 
     const volumeSeries = chart.addSeries(HistogramSeries, {
@@ -111,6 +153,31 @@ export const ChartContainer: React.FC<ChartContainerProps> = ({
       volumeSeriesRef.current = null;
     };
   }, []);
+
+  // React to theme changes dynamically
+  useEffect(() => {
+    if (!chartRef.current || !candleSeriesRef.current) return;
+    const colors = getChartThemeColors(theme);
+    chartRef.current.applyOptions({
+      layout: {
+        background: { type: ColorType.Solid, color: colors.background },
+        textColor: colors.textColor,
+      },
+      grid: {
+        vertLines: { color: colors.gridColor },
+        horzLines: { color: colors.gridColor },
+      },
+      timeScale: { borderColor: colors.borderColor },
+      rightPriceScale: { borderColor: colors.borderColor },
+    });
+    candleSeriesRef.current.applyOptions({
+      upColor: colors.upColor,
+      downColor: colors.downColor,
+      borderColor: colors.downColor,
+      wickUpColor: colors.wickUpColor,
+      wickDownColor: colors.wickDownColor,
+    });
+  }, [theme]);
 
   // Update Full Series Data
   useEffect(() => {

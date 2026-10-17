@@ -8,24 +8,37 @@ export interface AppStore {
   timeframe: Timeframe;
   replayState: ReplayState;
   portfolio: PortfolioState;
-  activeDrawingTool: 'cursor' | 'trendline' | 'horizontal_ray' | 'rectangle' | 'fibonacci' | 'position' | null;
+  activeDrawingTool: 'cursor' | 'trendline' | 'horizontal_ray' | 'rectangle' | 'fibonacci' | 'position' | 'text' | 'brush' | 'ruler' | null;
   indicators: {
     sma20: boolean;
     ema50: boolean;
     rsi14: boolean;
   };
+  theme: 'light' | 'dark';
+  activeRightPanel: 'order' | 'objectTree' | 'watchlist' | 'journal' | 'news' | null;
+  rthMode: 'ETH' | 'RTH';
+  scaleMode: 'normal' | 'percent' | 'log';
   setSymbol: (symbol: string) => void;
   setTimeframe: (tf: Timeframe) => void;
   setReplayState: (state: ReplayState) => void;
   setPortfolio: (portfolio: PortfolioState) => void;
   setActiveDrawingTool: (tool: AppStore['activeDrawingTool']) => void;
   toggleIndicator: (indicator: keyof AppStore['indicators']) => void;
+  setTheme: (theme: 'light' | 'dark') => void;
+  setActiveRightPanel: (panel: AppStore['activeRightPanel']) => void;
+  setRthMode: (mode: 'ETH' | 'RTH') => void;
+  setScaleMode: (mode: 'normal' | 'percent' | 'log') => void;
+  resetStore: () => void;
 }
 
 export function createInitialStoreState() {
   return {
     symbol: 'BTCUSDT',
     timeframe: '1m' as Timeframe,
+    theme: 'light' as const,
+    activeRightPanel: null as AppStore['activeRightPanel'],
+    rthMode: 'ETH' as const,
+    scaleMode: 'normal' as const,
     replayState: {
       currentIndex: 0,
       isPlaying: false,
@@ -63,4 +76,9 @@ export const useStore = create<AppStore>((set) => ({
   toggleIndicator: (ind) => set((s) => ({
     indicators: { ...s.indicators, [ind]: !s.indicators[ind] },
   })),
+  setTheme: (theme) => set({ theme }),
+  setActiveRightPanel: (activeRightPanel) => set({ activeRightPanel }),
+  setRthMode: (rthMode) => set({ rthMode }),
+  setScaleMode: (scaleMode) => set({ scaleMode }),
+  resetStore: () => set(createInitialStoreState()),
 }));
