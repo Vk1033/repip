@@ -1,0 +1,406 @@
+import React, { useRef, useEffect, useState, useCallback } from 'react';
+import { IChartApi, ISeriesApi, Time } from '@tradingview/lightweight-charts';
+import { DrawingShape, DrawingPoint } from '../core/drawing-manager';
+import { useStore } from '../store/useStore';
+
+export interface DrawingOverlayProps {
+  chart: IChartApi | null;
+  series: ISeriesApi<'Candlestick'> | null;
+  initialShapes?: DrawingShape[];
+  shapes?: DrawingShape[];
+  onShapesChange?: (shapes: DrawingShape[]) => void;
+  onClearDrawings?: () => void;
+}
+
+export const DEFAULT_TOOL_COLORS: Record<string, string> = {
+  trendline: '#2962ff',       // Classic TradingView blue
+  horizontal_ray: '#f59e0b',  // Amber
+  rectangle: '#8b5cf6',       // Purple (Order Block)
+  position: '#26a69a',        // Bullish teal
+  fibonacci: '#06b6d4',       // Cyan
+};
+
+export const DrawingOverlay: React.FC<DrawingOverlayProps> = ({
+  chart,
+  series,
+  initialShapes,
+  shapes: controlledShapes,
+  onShapesChange,
+  onClearDrawings,
+}) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [internalShapes, setInternalShapes] = useState<DrawingShape[]>(initialShapes ?? []);
+  const shapes = controlledShapes !== undefined ? controlledShapes : internalShapes;
+  const [currentPoints, setCurrentPoints] = useState<DrawingPoint[]>([]);
+  const [mousePreview, setMousePreview] = useState<{ x: number; y: number } | null>(null);
+
+  const activeTool = useStore((s) => s.activeDrawingTool);
+  const setActiveTool = useStore((s) => s.setActiveDrawingTool);
+
+  // Safely execute external callback when shapes change outside render/updater phase
+  const onShapesChangeRef = useRef(onShapesChange);
+  onShapesChangeRef.current = onShapesChange;
+
+  const onClearDrawingsRef = useRef(onClearDrawings);
+  onClearDrawingsRef.current = onClearDrawings;
+
+  // Pure updater for shapes state
+  const updateShapes = useCallback(
+    (updater: (prev: DrawingShape[]) => DrawingShape[]) => {
+      if (controlledShapes !== undefined) {
+        const next = updater(controlledShapes);
+        onShapesChangeRef.current?.(next);
+      } else {
+        setInternalShapes((prev) => {
+          const next = updater(prev);
+          onShapesChangeRef.current?.(next);
+          return next;
+        });
+      }
+    },
+    [controlledShapes]
+  );
+
+  // When shapes are cleared, reset any in-progress drawing points
+  useEffect(() => {
+    if (controlledShapes !== undefined && controlledShapes.length === 0) {
+      setCurrentPoints([]);
+      setMousePreview(null);
+    }
+  }, [controlledShapes]);
+
+  const isFirstMountRef = useRef(true);
+
+  useEffect(() => {
+    if (controlledShapes !== undefined) return;
+    if (isFirstMountRef.current) {
+      isFirstMountRef.current = false;
+      return;
+    }
+    if (onShapesChangeRef.current) {
+      onShapesChangeRef.current(shapes);
+    }
+  }, [shapes, controlledShapes]);
+
+  // Redraw all shapes on the canvas
+  const redraw = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !chart || !series) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Scale canvas context by devicePixelRatio for crisp rendering on high-DPI displays
+    const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    const cssWidth = canvas.width / dpr;
+    const cssHeight = canvas.height / dpr;
+    ctx.clearRect(0, 0, cssWidth, cssHeight);
+
+    const timeScale = chart.timeScale();
+
+    // 1. Draw completed shapes
+    for (const shape of shapes) {
+      const p1 = shape.points[0];
+      const p2 = shape.points[1];
+      if (!p1) continue;
+
+      const x1 = timeScale.timeToCoordinate(p1.time as unknown as Time) ?? -100;
+      const y1 = series.priceToCoordinate(p1.price) ?? -100;
+
+      if (shape.type === 'horizontal_ray') {
+        ctx.strokeStyle = shape.color || DEFAULT_TOOL_COLORS.horizontal_ray;
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(cssWidth, y1);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      } else if (shape.type === 'trendline' && p2) {
+        const x2 = timeScale.timeToCoordinate(p2.time as unknown as Time) ?? -100;
+        const y2 = series.priceToCoordinate(p2.price) ?? -100;
+        ctx.strokeStyle = shape.color || DEFAULT_TOOL_COLORS.trendline;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+      } else if (shape.type === 'rectangle' && p2) {
+        const x2 = timeScale.timeToCoordinate(p2.time as unknown as Time) ?? -100;
+        const y2 = series.priceToCoordinate(p2.price) ?? -100;
+        ctx.fillStyle = 'rgba(139, 92, 246, 0.15)';
+        ctx.strokeStyle = shape.color || DEFAULT_TOOL_COLORS.rectangle;
+        ctx.lineWidth = 1.5;
+        ctx.fillRect(x1, y1, x2 - x1, y2 - y1);
+        ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+      } else if (shape.type === 'position' && p2) {
+        const x2 = timeScale.timeToCoordinate(p2.time as unknown as Time) ?? -100;
+        const y2 = series.priceToCoordinate(p2.price) ?? -100;
+        const left = Math.min(x1, x2);
+        const width = Math.abs(x2 - x1);
+
+        // Profit target zone (green)
+        const targetTop = Math.min(y1, y2);
+        const targetHeight = Math.abs(y2 - y1);
+        ctx.fillStyle = 'rgba(38, 166, 154, 0.2)';
+        ctx.strokeStyle = '#26a69a';
+        ctx.lineWidth = 1.5;
+        ctx.fillRect(left, targetTop, width, targetHeight);
+        ctx.strokeRect(left, targetTop, width, targetHeight);
+
+        // Stop loss zone (red, symmetric 1:1 risk box)
+        const isLong = p2.price >= p1.price;
+        const stopY = isLong ? y1 : y1 - targetHeight;
+        ctx.fillStyle = 'rgba(239, 83, 80, 0.2)';
+        ctx.strokeStyle = '#ef5350';
+        ctx.lineWidth = 1.5;
+        ctx.fillRect(left, stopY, width, targetHeight);
+        ctx.strokeRect(left, stopY, width, targetHeight);
+
+        // Entry baseline
+        ctx.strokeStyle = '#d1d4dc';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath();
+        ctx.moveTo(left, y1);
+        ctx.lineTo(left + width, y1);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      } else if (shape.type === 'fibonacci' && p2) {
+        const x2 = timeScale.timeToCoordinate(p2.time as unknown as Time) ?? -100;
+        const y2 = series.priceToCoordinate(p2.price) ?? -100;
+        const left = Math.min(x1, x2);
+        const right = Math.max(x1, x2);
+        const levels = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1.0];
+        const dy = y2 - y1;
+
+        levels.forEach((lvl) => {
+          const y = y1 + dy * lvl;
+          ctx.strokeStyle = shape.color || DEFAULT_TOOL_COLORS.fibonacci;
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(left, y);
+          ctx.lineTo(right, y);
+          ctx.stroke();
+        });
+      }
+    }
+
+    // 2. Draw in-progress anchor and preview
+    if (currentPoints.length > 0 && activeTool && activeTool !== 'cursor') {
+      const p1 = currentPoints[0];
+      const x1 = timeScale.timeToCoordinate(p1.time as unknown as Time) ?? p1.x ?? -100;
+      const y1 = series.priceToCoordinate(p1.price) ?? p1.y ?? -100;
+
+      // Anchor point circle
+      ctx.fillStyle = '#2962ff';
+      ctx.beginPath();
+      ctx.arc(x1, y1, 4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      // Live cursor preview line / rect
+      if (mousePreview) {
+        ctx.save();
+        ctx.setLineDash([3, 3]);
+        ctx.strokeStyle = DEFAULT_TOOL_COLORS[activeTool] || '#2962ff';
+        ctx.lineWidth = 1.5;
+
+        if (activeTool === 'trendline') {
+          ctx.beginPath();
+          ctx.moveTo(x1, y1);
+          ctx.lineTo(mousePreview.x, mousePreview.y);
+          ctx.stroke();
+        } else if (activeTool === 'rectangle') {
+          ctx.fillStyle = 'rgba(139, 92, 246, 0.1)';
+          ctx.fillRect(x1, y1, mousePreview.x - x1, mousePreview.y - y1);
+          ctx.strokeRect(x1, y1, mousePreview.x - x1, mousePreview.y - y1);
+        } else if (activeTool === 'position') {
+          const left = Math.min(x1, mousePreview.x);
+          const width = Math.abs(mousePreview.x - x1);
+          ctx.fillStyle = 'rgba(38, 166, 154, 0.15)';
+          ctx.fillRect(left, Math.min(y1, mousePreview.y), width, Math.abs(mousePreview.y - y1));
+          ctx.strokeRect(left, Math.min(y1, mousePreview.y), width, Math.abs(mousePreview.y - y1));
+        }
+
+        ctx.restore();
+      }
+    }
+  }, [chart, series, shapes, currentPoints, activeTool, mousePreview]);
+
+  // Stable redraw reference to prevent timescale subscription churn
+  const redrawRef = useRef(redraw);
+  redrawRef.current = redraw;
+
+  // Subscribe to chart zoom, pan, and scroll range events ONCE per chart instance
+  useEffect(() => {
+    if (!chart) return;
+    const timeScale = chart.timeScale();
+
+    const onTimescaleChange = () => {
+      redrawRef.current();
+    };
+
+    timeScale.subscribeVisibleTimeRangeChange(onTimescaleChange);
+    timeScale.subscribeVisibleLogicalRangeChange(onTimescaleChange);
+    onTimescaleChange();
+
+    return () => {
+      timeScale.unsubscribeVisibleTimeRangeChange(onTimescaleChange);
+      timeScale.unsubscribeVisibleLogicalRangeChange(onTimescaleChange);
+    };
+  }, [chart]);
+
+  // Trigger redraw whenever shapes, active tool, current points, or mouse preview changes
+  useEffect(() => {
+    redraw();
+  }, [redraw]);
+
+  // Adjust canvas pixel buffer resolution for devicePixelRatio and container dimensions
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const updateSize = () => {
+      const parent = canvas.parentElement;
+      const cssW = parent?.clientWidth || (typeof window !== 'undefined' ? window.innerWidth : 800);
+      const cssH = parent?.clientHeight || (typeof window !== 'undefined' ? window.innerHeight : 600);
+      const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
+      const targetW = Math.round(cssW * dpr);
+      const targetH = Math.round(cssH * dpr);
+
+      if (canvas.width !== targetW || canvas.height !== targetH) {
+        canvas.width = targetW;
+        canvas.height = targetH;
+        canvas.style.width = `${cssW}px`;
+        canvas.style.height = `${cssH}px`;
+        redrawRef.current();
+      }
+    };
+
+    updateSize();
+
+    let resizeObserver: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined' && canvas.parentElement) {
+      resizeObserver = new ResizeObserver(updateSize);
+      resizeObserver.observe(canvas.parentElement);
+    }
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('resize', updateSize);
+    }
+
+    return () => {
+      if (resizeObserver) resizeObserver.disconnect();
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('resize', updateSize);
+      }
+    };
+  }, []);
+
+  // Reset in-progress points when tool is switched to cursor or cancelled
+  useEffect(() => {
+    if (activeTool === 'cursor' || !activeTool) {
+      setCurrentPoints([]);
+      setMousePreview(null);
+    }
+  }, [activeTool]);
+
+  // Handle escape key to cancel active drawing
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setCurrentPoints([]);
+        setMousePreview(null);
+        setActiveTool('cursor');
+      }
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [setActiveTool]);
+
+  // Handle canvas mouse move for interactive preview
+  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!activeTool || activeTool === 'cursor' || currentPoints.length === 0) {
+      if (mousePreview) setMousePreview(null);
+      return;
+    }
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    setMousePreview({ x, y });
+  };
+
+  // Handle clicks to place points or complete shapes
+  const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!chart || !series || activeTool === 'cursor' || !activeTool) return;
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    const time = chart.timeScale().coordinateToTime(x) as number | null;
+    const price = series.coordinateToPrice(y);
+    if (time === null || price === null) return;
+
+    const pt: DrawingPoint = { time, price, x, y };
+
+    if (activeTool === 'horizontal_ray') {
+      updateShapes((prev) => [
+        ...prev,
+        {
+          id: Math.random().toString(),
+          type: 'horizontal_ray',
+          points: [pt],
+          color: DEFAULT_TOOL_COLORS.horizontal_ray,
+        },
+      ]);
+      setActiveTool('cursor');
+    } else if (
+      activeTool === 'trendline' ||
+      activeTool === 'rectangle' ||
+      activeTool === 'position' ||
+      activeTool === 'fibonacci'
+    ) {
+      if (currentPoints.length === 0) {
+        setCurrentPoints([pt]);
+      } else {
+        const color = DEFAULT_TOOL_COLORS[activeTool] || '#2962ff';
+        updateShapes((prev) => [
+          ...prev,
+          {
+            id: Math.random().toString(),
+            type: activeTool,
+            points: [currentPoints[0], pt],
+            color,
+          },
+        ]);
+        setCurrentPoints([]);
+        setMousePreview(null);
+        setActiveTool('cursor');
+      }
+    }
+  };
+
+  const isInteractive = activeTool !== 'cursor' && activeTool !== null;
+
+  return (
+    <canvas
+      ref={canvasRef}
+      data-testid="drawing-overlay"
+      width={typeof window !== 'undefined' ? Math.round(window.innerWidth * (window.devicePixelRatio || 1)) : 800}
+      height={typeof window !== 'undefined' ? Math.round(window.innerHeight * (window.devicePixelRatio || 1)) : 600}
+      onClick={handleCanvasClick}
+      onMouseMove={handleMouseMove}
+      className={`absolute inset-0 z-10 ${
+        isInteractive ? 'pointer-events-auto cursor-crosshair' : 'pointer-events-none'
+      }`}
+    />
+  );
+};

@@ -1,0 +1,84 @@
+import { create } from 'zustand';
+import { Timeframe } from '../types/market';
+import { ReplayState } from '../core/replay-clock';
+import { PortfolioState } from '../core/paper-trading';
+
+export interface AppStore {
+  symbol: string;
+  timeframe: Timeframe;
+  replayState: ReplayState;
+  portfolio: PortfolioState;
+  activeDrawingTool: 'cursor' | 'trendline' | 'horizontal_ray' | 'rectangle' | 'fibonacci' | 'position' | 'text' | 'brush' | 'ruler' | null;
+  indicators: {
+    sma20: boolean;
+    ema50: boolean;
+    rsi14: boolean;
+  };
+  theme: 'light' | 'dark';
+  activeRightPanel: 'order' | 'objectTree' | 'watchlist' | 'journal' | 'news' | null;
+  rthMode: 'ETH' | 'RTH';
+  scaleMode: 'normal' | 'percent' | 'log';
+  setSymbol: (symbol: string) => void;
+  setTimeframe: (tf: Timeframe) => void;
+  setReplayState: (state: ReplayState) => void;
+  setPortfolio: (portfolio: PortfolioState) => void;
+  setActiveDrawingTool: (tool: AppStore['activeDrawingTool']) => void;
+  toggleIndicator: (indicator: keyof AppStore['indicators']) => void;
+  setTheme: (theme: 'light' | 'dark') => void;
+  setActiveRightPanel: (panel: AppStore['activeRightPanel']) => void;
+  setRthMode: (mode: 'ETH' | 'RTH') => void;
+  setScaleMode: (mode: 'normal' | 'percent' | 'log') => void;
+  resetStore: () => void;
+}
+
+export function createInitialStoreState() {
+  return {
+    symbol: 'BTCUSDT',
+    timeframe: '1m' as Timeframe,
+    theme: 'light' as const,
+    activeRightPanel: null as AppStore['activeRightPanel'],
+    rthMode: 'ETH' as const,
+    scaleMode: 'normal' as const,
+    replayState: {
+      currentIndex: 0,
+      isPlaying: false,
+      speed: 1,
+      currentCandle: null,
+      totalCandles: 0,
+    },
+    portfolio: {
+      balance: 10000,
+      equity: 10000,
+      realizedPnL: 0,
+      unrealizedPnL: 0,
+      positions: [] as PortfolioState['positions'],
+      pendingOrders: [] as PortfolioState['pendingOrders'],
+      closedTrades: [] as PortfolioState['closedTrades'],
+    },
+    activeDrawingTool: 'cursor' as const,
+    indicators: {
+      sma20: false,
+      ema50: false,
+      rsi14: false,
+    },
+  };
+}
+
+export const initialStoreState = createInitialStoreState();
+
+export const useStore = create<AppStore>((set) => ({
+  ...createInitialStoreState(),
+  setSymbol: (symbol) => set({ symbol }),
+  setTimeframe: (timeframe) => set({ timeframe }),
+  setReplayState: (replayState) => set({ replayState }),
+  setPortfolio: (portfolio) => set({ portfolio }),
+  setActiveDrawingTool: (tool) => set({ activeDrawingTool: tool }),
+  toggleIndicator: (ind) => set((s) => ({
+    indicators: { ...s.indicators, [ind]: !s.indicators[ind] },
+  })),
+  setTheme: (theme) => set({ theme }),
+  setActiveRightPanel: (activeRightPanel) => set({ activeRightPanel }),
+  setRthMode: (rthMode) => set({ rthMode }),
+  setScaleMode: (scaleMode) => set({ scaleMode }),
+  resetStore: () => set(createInitialStoreState()),
+}));
