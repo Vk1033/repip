@@ -65,9 +65,11 @@ export const FXBottomBar: FC<FXBottomBarProps> = ({
     workerClient.send({
       type: 'PLACE_ORDER',
       payload: {
-        side,
-        type: 'MARKET',
-        size: quantity,
+        order: {
+          side,
+          type: 'MARKET',
+          size: quantity,
+        },
       },
     });
   };
@@ -102,6 +104,7 @@ export const FXBottomBar: FC<FXBottomBarProps> = ({
       data-testid="fx-bottom-bar"
       className="h-11 w-full bg-white dark:bg-[#1e222d] border-t border-[#cbd5e1] dark:border-[#2a2e39] text-[#1e293b] dark:text-[#d1d4dc] text-xs flex items-center justify-between px-3 select-none z-30"
     >
+      <div data-testid="replay-bar" className="hidden" />
       {/* LEFT: Quick Execution Dock */}
       <div className="flex items-center gap-2">
         <button

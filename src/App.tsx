@@ -2,15 +2,18 @@ import { useEffect, useState, useCallback } from 'react';
 import { WorkerClient } from './workers/worker-client';
 import { ChartContainer } from './components/ChartContainer';
 import { DrawingOverlay } from './components/DrawingOverlay';
-import { TopBar } from './components/TopBar';
 import { LeftToolbar } from './components/LeftToolbar';
-import { ReplayBar } from './components/ReplayBar';
-import { TradingPanel } from './components/TradingPanel';
 import { useStore } from './store/useStore';
 import { fetchBinance1mKlines } from './data/binance';
 import { Candle } from './types/market';
 import { DrawingShape } from './core/drawing-manager';
 import { IChartApi, ISeriesApi } from '@tradingview/lightweight-charts';
+
+import { FXTopBar } from './components/FXTopBar';
+import { FloatingToolbar } from './components/FloatingToolbar';
+import { TimelineNewsMarkers } from './components/TimelineNewsMarkers';
+import { FXBottomBar } from './components/FXBottomBar';
+import { RightDock } from './components/RightDock';
 
 export interface AppProps {
   workerClient?: WorkerClient;
@@ -49,6 +52,9 @@ export function App({ workerClient: initialClient, autoLoadData = true }: AppPro
   const [seriesApi, setSeriesApi] = useState<ISeriesApi<'Candlestick'> | null>(null);
   const [shapes, setShapes] = useState<DrawingShape[]>([]);
 
+  const theme = useStore((s) => s.theme);
+  const activeDrawingTool = useStore((s) => s.activeDrawingTool);
+  const setActiveDrawingTool = useStore((s) => s.setActiveDrawingTool);
   const setReplayState = useStore((s) => s.setReplayState);
   const setPortfolio = useStore((s) => s.setPortfolio);
 
@@ -138,12 +144,16 @@ export function App({ workerClient: initialClient, autoLoadData = true }: AppPro
     }
   };
 
+  const lastPrice = lastUpdate?.candle?.close ?? candles[candles.length - 1]?.close ?? 21293.25;
+
   return (
     <div
       data-testid="app-root"
-      className="h-screen w-screen flex flex-col bg-tv-bg text-tv-text select-none overflow-hidden"
+      className={`h-screen w-screen flex flex-col ${
+        theme === 'dark' ? 'dark bg-[#131722] text-[#d1d4dc]' : 'bg-[#e5e8ec] text-[#1e293b]'
+      } select-none overflow-hidden`}
     >
-      <TopBar workerClient={workerClient} />
+      <FXTopBar workerClient={workerClient} />
 
       <div className="flex-1 flex relative overflow-hidden">
         <LeftToolbar onClearDrawings={handleClearDrawings} />
@@ -164,11 +174,26 @@ export function App({ workerClient: initialClient, autoLoadData = true }: AppPro
             onShapesChange={setShapes}
             onClearDrawings={handleClearDrawings}
           />
-          <ReplayBar workerClient={workerClient} onJumpClick={handleJumpClick} />
+          <FloatingToolbar
+            activeTool={activeDrawingTool}
+            onSelectTool={setActiveDrawingTool}
+            onClearDrawings={handleClearDrawings}
+          />
+          <TimelineNewsMarkers />
         </div>
 
-        <TradingPanel workerClient={workerClient} />
+        <RightDock
+          workerClient={workerClient}
+          shapes={shapes}
+          onShapesChange={setShapes}
+        />
       </div>
+
+      <FXBottomBar
+        workerClient={workerClient}
+        onJumpClick={handleJumpClick}
+        lastPrice={lastPrice}
+      />
     </div>
   );
 }

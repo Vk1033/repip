@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect, FC } from 'react';
+import { useState, useRef, type FC } from 'react';
+import type React from 'react';
 import {
   GripVertical,
   MousePointer,
@@ -47,7 +48,7 @@ export const FloatingToolbar: FC<FloatingToolbarProps> = ({
       posY: position.y,
     };
 
-    const handleMouseMove = (moveEvent: MouseEvent) => {
+    const handleMouseMove = (moveEvent: globalThis.MouseEvent) => {
       if (!isDraggingRef.current) return;
       const dx = moveEvent.clientX - dragStartRef.current.startX;
       const dy = moveEvent.clientY - dragStartRef.current.startY;

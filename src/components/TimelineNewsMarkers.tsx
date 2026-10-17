@@ -1,5 +1,5 @@
-import React, { useState, FC } from 'react';
-import { X, AlertCircle } from 'lucide-react';
+import { useState, type FC } from 'react';
+import { X } from 'lucide-react';
 
 export interface EconomicEvent {
   id: string;

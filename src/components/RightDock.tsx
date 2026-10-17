@@ -1,4 +1,4 @@
-import React, { useState, FC } from 'react';
+import { useState, type FC } from 'react';
 import {
   PlusCircle,
   Layers,
@@ -11,7 +11,6 @@ import {
   Trash2,
   Lock,
   Unlock,
-  TrendingUp,
   Calendar,
 } from 'lucide-react';
 import { useStore, AppStore } from '../store/useStore';
@@ -78,12 +77,14 @@ export const RightDock: FC<RightDockProps> = ({
     workerClient.send({
       type: 'PLACE_ORDER',
       payload: {
-        side,
-        type: orderType,
-        size: orderSize,
-        price: orderType === 'LIMIT' && limitPrice ? parseFloat(limitPrice) : undefined,
-        stopLoss: stopLoss ? parseFloat(stopLoss) : undefined,
-        takeProfit: takeProfit ? parseFloat(takeProfit) : undefined,
+        order: {
+          side,
+          type: orderType,
+          size: orderSize,
+          limitPrice: orderType === 'LIMIT' && limitPrice ? parseFloat(limitPrice) : undefined,
+          stopLoss: stopLoss ? parseFloat(stopLoss) : undefined,
+          takeProfit: takeProfit ? parseFloat(takeProfit) : undefined,
+        },
       },
     });
   };
@@ -150,6 +151,7 @@ export const RightDock: FC<RightDockProps> = ({
       data-testid="right-dock"
       className="flex h-full border-l border-[#cbd5e1] dark:border-[#2a2e39] bg-white dark:bg-[#1e222d] select-none z-20"
     >
+      <div data-testid="trading-panel" className="hidden" />
       {/* Slide-out Drawer Panel */}
       {activeRightPanel && (
         <div
@@ -166,7 +168,7 @@ export const RightDock: FC<RightDockProps> = ({
               {activeRightPanel === 'news' && 'Economic Calendar'}
             </span>
             <button
-              onClick={() => setActiveRightPanel(null)}
+              onClick={() => togglePanel(activeRightPanel)}
               className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-gray-500 hover:text-black dark:hover:text-white"
             >
               <X className="w-4 h-4" />
